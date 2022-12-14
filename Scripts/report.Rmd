@@ -1,0 +1,85 @@
+---
+title: "VPI-Dashboard"
+output: 
+    html_document:
+      css: style.css
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(OutDec = ",")
+
+library(dplyr)
+library(ggplot2)
+library(plotly)
+library(scales)
+library(kableExtra)
+library(lubridate)
+library(stringr)
+df.index_miete <- readRDS(file = "Output/df_index_miete.RDS")
+list.vertragsdaten <- readRDS(file = "Output/list_vertragsdaten.RDS")
+df.vpi <- readRDS(file = "Output/df_vpi.RDS")
+
+latest_vpi <- format(max(df.vpi$date), "%B %Y")
+latest_rent_delta <- round((df.index_miete |> slice_tail(n=1))$rent_delta, 2)
+latest_rent <- round((df.index_miete |> slice_tail(n=1))$rent, 2)
+```
+
+## Miete nach Verbraucherpreisindex
+
+Mit dem aktuellen VPI vom ```r latest_vpi``` könnte die Kaltmiete um ```r sprintf("%s€", latest_rent_delta)```€ auf ```r sprintf("%s€", latest_rent)```€ `r ifelse(latest_rent_delta > 0, "erhöht", "gesenkt")` werden.
+
+```{r echo=FALSE, fig.asp = 0.5, fig.width = 10}
+fig.rent_progression <- df.index_miete |>  
+    filter(!is.na(vpi)) |> 
+    ggplot(aes(x = as.Date(date), y = rent)) +
+    geom_line() +
+    geom_point() +
+    scale_y_continuous(labels = scales::unit_format(unit="€", sep="", big.mark=".", decimal.mark=",", accuracy=1)) +
+    scale_x_date(breaks = "1 month", date_labels = "%B %Y") +
+    labs(
+        title = "Entwicklung der Miete",
+        y = "Miete",
+        x = "Datum"
+    ) +
+    ktools::theme_kudusch()
+fig.rent_progression
+# ggplotly(fig.cases, tooltip = c("x", "y"), dynamicTicks = TRUE) %>% 
+#  plotly::config(displayModeBar = FALSE) %>% 
+#  plotly::layout(legend = list(orientation = "h", x = 0, y = -0.3))
+```
+
+## Die Entwicklung des VPI
+
+```{r echo=FALSE, fig.asp = 0.5, fig.width = 10}
+df.vpi |> 
+    ggplot(aes(x = date, y = vpi)) +
+    geom_line() +
+    geom_point(x = as.POSIXct(list.vertragsdaten$vertragsstart), y = list.vertragsdaten$start_vpi) +
+    labs(
+        title = "Verbraucherpreisindex über Zeit", 
+        y = "VPI",
+        x = ""
+    ) +
+    ktools::theme_kudusch()
+```
+
+```{r echo=FALSE, fig.asp = 0.5, fig.width = 10}
+df.vpi |> 
+    mutate(angestiegen = factor(vpi_vormonat > 0, levels = c(T,F))) |> 
+    filter(date > max(date)-months(12)) |> 
+    mutate(vpi_vormonat_kum = cumsum(vpi_vormonat)) |> 
+    ggplot(aes(x = date, y = vpi_vormonat)) +
+    geom_col(aes(fill = angestiegen)) +
+    geom_line(aes(y = vpi_vormonat_kum)) +
+    scale_fill_manual(values = c("#760E0E", "#298423")) +
+    scale_y_continuous(labels = scales::percent) +
+    labs(
+        title = "Verbraucherpreisindex über die letzten 12 Monate", 
+        subtitle = "Veränderung zum Vormonat in %",
+        y = "",
+        x = ""
+    ) +
+    ktools::theme_kudusch() +
+    theme(legend.position = "none")
+```
