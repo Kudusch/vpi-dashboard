@@ -1,6 +1,6 @@
 rmarkdown::render(
-    paste0("report.Rmd"), 
-    knit_root_dir = "/Users/kudusch/Desktop/vpi-dashboard",
+    paste0("Scripts/report.Rmd"), 
+    knit_root_dir = "/Users/kudusch/Desktop/vpi-dashboard/",
     output_format = rmarkdown::html_document(
         theme = NULL,
         mathjax = NULL,

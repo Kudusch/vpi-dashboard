@@ -8,7 +8,7 @@ curl -s "https://www-genesis.destatis.de/genesisWS/rest/2020/data/tablefile?user
 FILESIZE=$(stat -f %z vpi_tmp.csv)
 
 if (( FILESIZE > MAXSIZE )); then
-  mv vpi_tmp.csv vpi.csv
+  mv vpi_tmp.csv Data/vpi.csv
 else
   echo "Nothing new"
   rm vpi_tmp.csv

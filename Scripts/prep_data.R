@@ -48,10 +48,13 @@ df.vpi <- read_delim(
 
 list.vertragsdaten <- list(
     "grundmiete" = 1466.86,
-    "vertragsstart" = date("2022-09-01"),
-    "letze_erhöhung" = date("2022-09-01")
+    "vertragsstart" = date("2022-09-01")
 )
 list.vertragsdaten$start_vpi <- df.vpi$vpi[which(df.vpi$date == list.vertragsdaten$vertragsstart)]
+list.vertragsdaten$erhoehungen <- tibble(
+    date = c(date("2023-12-01")),
+    rent = c(1533.31)
+)
 
 df.index_miete <- df.vpi |> 
     mutate(change_in_vpi = vpi/list.vertragsdaten$start_vpi) |> 

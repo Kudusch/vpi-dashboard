@@ -11,6 +11,7 @@ options(OutDec = ",")
 
 library(dplyr)
 library(ggplot2)
+library(patchwork)
 library(plotly)
 library(scales)
 library(kableExtra)
@@ -21,13 +22,13 @@ list.vertragsdaten <- readRDS(file = "Output/list_vertragsdaten.RDS")
 df.vpi <- readRDS(file = "Output/df_vpi.RDS")
 
 latest_vpi <- format(max(df.vpi$date), "%B %Y")
-latest_rent_delta <- round((df.index_miete |> slice_tail(n=1))$rent_delta, 2)
-latest_rent <- round((df.index_miete |> slice_tail(n=1))$rent, 2)
+potential_current_rent <- round((df.index_miete |> slice_tail(n=1))$rent, 2)
+current_rent <- round((list.vertragsdaten$erhoehungen |> slice(n()))$rent, 2)
 ```
 
 ## Miete nach Verbraucherpreisindex
 
-Mit dem aktuellen VPI vom ```r latest_vpi``` könnte die Kaltmiete um ```r sprintf("%s€", latest_rent_delta)```€ auf ```r sprintf("%s€", latest_rent)```€ `r ifelse(latest_rent_delta > 0, "erhöht", "gesenkt")` werden.
+Mit dem aktuellen VPI vom ```r latest_vpi``` könnte die Kaltmiete um ```r sprintf("%s€", round(potential_current_rent - current_rent,2))``` auf ```r sprintf("%s€", potential_current_rent)``` `r ifelse(potential_current_rent > current_rent, "erhöht", "gesenkt")` werden. Damit liegt die aktuelle Miete ```r sprintf("%s€", round(potential_current_rent-list.vertragsdaten$grundmiete,2))``` `r ifelse(potential_current_rent > list.vertragsdaten$grundmiete, "über", "unter")` der Miete bei Vertragsstart.
 
 ```{r echo=FALSE, fig.asp = 0.5, fig.width = 10}
 fig.rent_progression <- df.index_miete |>  
@@ -36,7 +37,7 @@ fig.rent_progression <- df.index_miete |>
     geom_line() +
     geom_point() +
     scale_y_continuous(labels = scales::unit_format(unit="€", sep="", big.mark=".", decimal.mark=",", accuracy=1)) +
-    scale_x_date(breaks = "1 month", date_labels = "%B %Y") +
+    scale_x_date(date_labels = "%B %Y") +
     labs(
         title = "Entwicklung der Miete",
         y = "Miete",
@@ -51,17 +52,48 @@ fig.rent_progression
 
 ## Die Entwicklung des VPI
 
-```{r echo=FALSE, fig.asp = 0.5, fig.width = 10}
-df.vpi |> 
+```{r echo=FALSE, fig.asp = 0.5, fig.width = 10, message=FALSE, warning=FALSE}
+full_fig <- df.vpi |> 
+    left_join(list.vertragsdaten$erhoehungen, by = "date") |> 
+    mutate(was_raised = ifelse(!is.na(rent), vpi, NA)) |> 
     ggplot(aes(x = date, y = vpi)) +
+    geom_hline(yintercept = list.vertragsdaten$start_vpi, color = "darkgreen") +
+    geom_hline(aes(yintercept = was_raised), color = "red") +
     geom_line() +
-    geom_point(x = as.POSIXct(list.vertragsdaten$vertragsstart), y = list.vertragsdaten$start_vpi) +
+    geom_point(aes(x = date, y = was_raised), size = 1) +
+    geom_point(
+        x = force_tz(list.vertragsdaten$vertragsstart, tzone = "CET"), 
+        y = list.vertragsdaten$start_vpi,
+        size = 1
+    ) +
     labs(
         title = "Verbraucherpreisindex über Zeit", 
         y = "VPI",
         x = ""
     ) +
     ktools::theme_kudusch()
+zoomed_fig <- df.vpi |> 
+    filter(lead(date) >= list.vertragsdaten$vertragsstart) |> 
+    left_join(list.vertragsdaten$erhoehungen, by = "date") |> 
+    mutate(was_raised = ifelse(!is.na(rent), vpi, NA)) |> 
+    ggplot(aes(x = as.Date(date), y = vpi)) +
+    geom_hline(yintercept = list.vertragsdaten$start_vpi, color = "darkgreen", linewidth = 1) +
+    geom_hline(aes(yintercept = was_raised), color = "red", linewidth = 1) +
+    geom_line(linewidth = 1) +
+    geom_point(aes(x = as.Date(date), y = was_raised), size = 2) +
+    geom_point(
+        x = force_tz(list.vertragsdaten$vertragsstart, tzone = "CET"), 
+        y = list.vertragsdaten$start_vpi,
+        size = 2
+    ) +
+    scale_x_date(breaks = "1 year", date_labels = "%Y", minor_breaks = "1 month") +
+    labs(
+        title = "… seit Vertragsbeginn", 
+        y = "VPI",
+        x = ""
+    ) +
+    ktools::theme_kudusch()
+(full_fig+zoomed_fig)+patchwork::plot_layout(ncol = 2, widths = c(2, 1))
 ```
 
 ```{r echo=FALSE, fig.asp = 0.5, fig.width = 10}
